@@ -65,8 +65,45 @@ document.addEventListener("DOMContentLoaded", () => {
             emailSpan.className = "participant-email";
             emailSpan.textContent = email;
 
+            const deleteButton = document.createElement("button");
+            deleteButton.className = "delete-participant";
+            deleteButton.innerHTML = "✕";
+            deleteButton.title = "Eliminar participante";
+            deleteButton.onclick = async (e) => {
+                e.preventDefault();
+                try {
+                    const response = await fetch(
+                        `/activities/${encodeURIComponent(name)}/unregister?email=${encodeURIComponent(email)}`,
+                        {
+                            method: "POST"
+                        }
+                    );
+
+                    if (response.ok) {
+                        await fetchActivities(); // Recargar la lista después de eliminar
+                        messageDiv.textContent = "Participante eliminado exitosamente";
+                        messageDiv.className = "success";
+                    } else {
+                        const error = await response.json();
+                        messageDiv.textContent = error.detail || "Error al eliminar el participante";
+                        messageDiv.className = "error";
+                    }
+
+                    messageDiv.classList.remove("hidden");
+                    setTimeout(() => {
+                        messageDiv.classList.add("hidden");
+                    }, 5000);
+                } catch (error) {
+                    console.error("Error al eliminar el participante:", error);
+                    messageDiv.textContent = "Error al eliminar el participante. Por favor, intente de nuevo.";
+                    messageDiv.className = "error";
+                    messageDiv.classList.remove("hidden");
+                }
+            };
+
             li.appendChild(avatar);
             li.appendChild(emailSpan);
+            li.appendChild(deleteButton);
             ul.appendChild(li);
           });
 
@@ -114,6 +151,8 @@ document.addEventListener("DOMContentLoaded", () => {
         messageDiv.textContent = result.message;
         messageDiv.className = "success";
         signupForm.reset();
+        // Actualizar la lista de actividades después de un registro exitoso
+        await fetchActivities();
       } else {
         messageDiv.textContent = result.detail || "An error occurred";
         messageDiv.className = "error";
