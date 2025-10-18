@@ -13,6 +13,18 @@ document.addEventListener("DOMContentLoaded", () => {
       // Clear loading message
       activitiesList.innerHTML = "";
 
+      // Reset activity select (keep placeholder)
+      activitySelect.innerHTML = '<option value="">-- Select an activity --</option>';
+
+      // Helper para iniciales desde email
+      function getInitials(email) {
+        const local = (email || "").split("@")[0] || "";
+        const parts = local.split(/[\.\-_]/).filter(Boolean);
+        if (parts.length === 0) return (local[0] || "?").toUpperCase();
+        const initials = parts.slice(0, 2).map(p => p[0]).join("");
+        return initials.toUpperCase();
+      }
+
       // Populate activities list
       Object.entries(activities).forEach(([name, details]) => {
         const activityCard = document.createElement("div");
@@ -20,6 +32,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const spotsLeft = details.max_participants - details.participants.length;
 
+        // Basic info
         activityCard.innerHTML = `
           <h4>${name}</h4>
           <p>${details.description}</p>
@@ -27,6 +40,82 @@ document.addEventListener("DOMContentLoaded", () => {
           <p><strong>Availability:</strong> ${spotsLeft} spots left</p>
         `;
 
+        // Participants section container
+        const participantsSection = document.createElement("div");
+        participantsSection.className = "participants-section";
+
+        const title = document.createElement("h5");
+        title.textContent = "Participants";
+        participantsSection.appendChild(title);
+
+        if (details.participants && details.participants.length > 0) {
+          const ul = document.createElement("ul");
+          ul.className = "participants-list";
+
+          details.participants.forEach((email) => {
+            const li = document.createElement("li");
+            li.className = "participant-item";
+
+            const avatar = document.createElement("span");
+            avatar.className = "avatar";
+            avatar.textContent = getInitials(email);
+            avatar.title = email;
+
+            const emailSpan = document.createElement("span");
+            emailSpan.className = "participant-email";
+            emailSpan.textContent = email;
+
+            const deleteButton = document.createElement("button");
+            deleteButton.className = "delete-participant";
+            deleteButton.innerHTML = "✕";
+            deleteButton.title = "Eliminar participante";
+            deleteButton.onclick = async (e) => {
+                e.preventDefault();
+                try {
+                    const response = await fetch(
+                        `/activities/${encodeURIComponent(name)}/unregister?email=${encodeURIComponent(email)}`,
+                        {
+                            method: "POST"
+                        }
+                    );
+
+                    if (response.ok) {
+                        await fetchActivities(); // Recargar la lista después de eliminar
+                        messageDiv.textContent = "Participante eliminado exitosamente";
+                        messageDiv.className = "success";
+                    } else {
+                        const error = await response.json();
+                        messageDiv.textContent = error.detail || "Error al eliminar el participante";
+                        messageDiv.className = "error";
+                    }
+
+                    messageDiv.classList.remove("hidden");
+                    setTimeout(() => {
+                        messageDiv.classList.add("hidden");
+                    }, 5000);
+                } catch (error) {
+                    console.error("Error al eliminar el participante:", error);
+                    messageDiv.textContent = "Error al eliminar el participante. Por favor, intente de nuevo.";
+                    messageDiv.className = "error";
+                    messageDiv.classList.remove("hidden");
+                }
+            };
+
+            li.appendChild(avatar);
+            li.appendChild(emailSpan);
+            li.appendChild(deleteButton);
+            ul.appendChild(li);
+          });
+
+          participantsSection.appendChild(ul);
+        } else {
+          const empty = document.createElement("div");
+          empty.className = "participants-empty";
+          empty.textContent = "No participants yet — be the first to sign up!";
+          participantsSection.appendChild(empty);
+        }
+
+        activityCard.appendChild(participantsSection);
         activitiesList.appendChild(activityCard);
 
         // Add option to select dropdown
@@ -62,6 +151,8 @@ document.addEventListener("DOMContentLoaded", () => {
         messageDiv.textContent = result.message;
         messageDiv.className = "success";
         signupForm.reset();
+        // Actualizar la lista de actividades después de un registro exitoso
+        await fetchActivities();
       } else {
         messageDiv.textContent = result.detail || "An error occurred";
         messageDiv.className = "error";
